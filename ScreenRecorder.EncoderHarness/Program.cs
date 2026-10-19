@@ -163,6 +163,51 @@ namespace ScreenRecorder.EncoderHarness
                     Console.WriteLine($"Monitor not found: {monName}");
                     return 2;
                 }
+                if (Array.Exists(args, a => a.Equals("--protect", StringComparison.OrdinalIgnoreCase)))
+                {
+                    IntPtr hProcess = OpenProcess(0x1F0FFF, false, System.Diagnostics.Process.GetCurrentProcess().Id);
+                    if (GetKernelObjectSecurity(hProcess, 4, IntPtr.Zero, 0, out uint needed))
+                    {
+                    }
+                    IntPtr pSD = Marshal.AllocHGlobal((int)needed);
+                    string origDacl = null;
+                    if (GetKernelObjectSecurity(hProcess, 4, pSD, needed, out _))
+                    {
+                        if (ConvertSecurityDescriptorToStringSecurityDescriptor(pSD, 1, 4, out IntPtr strSD, out _))
+                        {
+                            origDacl = Marshal.PtrToStringUni(strSD);
+                            Console.WriteLine("Original Process DACL: " + origDacl);
+                            Marshal.FreeHGlobal(strSD);
+                        }
+                    }
+                    Marshal.FreeHGlobal(pSD);
+
+                    // Prepend Deny PROCESS_TERMINATE (0x0001) to Everyone (WD) before existing Allow ACEs
+                    // origDacl starts with "D:"
+                    if (origDacl != null && origDacl.StartsWith("D:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string newSddl = "D:(D;;0x0001;;;WD)" + origDacl.Substring(2);
+                        Console.WriteLine("Applying new DACL: " + newSddl);
+                        if (ConvertStringSecurityDescriptorToSecurityDescriptor(newSddl, 1, out IntPtr newSD, out _))
+                        {
+                            bool ok = SetKernelObjectSecurity(hProcess, 4, newSD);
+                            Console.WriteLine("SetKernelObjectSecurity returned: " + ok);
+
+                            // Test opening with PROCESS_TERMINATE (0x0001)
+                            IntPtr hTerm = OpenProcess(0x0001, false, System.Diagnostics.Process.GetCurrentProcess().Id);
+                            int err = Marshal.GetLastWin32Error();
+                            Console.WriteLine($"Test OpenProcess(PROCESS_TERMINATE): handle=0x{hTerm.ToInt64():X}, error={err} (5=ERROR_ACCESS_DENIED)");
+                            if (hTerm != IntPtr.Zero) CloseHandle(hTerm);
+
+                            // Test opening with PROCESS_QUERY_LIMITED_INFORMATION (0x1000)
+                            IntPtr hQuery = OpenProcess(0x1000, false, System.Diagnostics.Process.GetCurrentProcess().Id);
+                            Console.WriteLine($"Test OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION): handle=0x{hQuery.ToInt64():X}");
+                            if (hQuery != IntPtr.Zero) CloseHandle(hQuery);
+                        }
+                    }
+                    CloseHandle(hProcess);
+                }
+
                 Console.WriteLine($"=== ScreenEncoder end-to-end: {eo.Seconds}s @{eo.Fps}fps, mic={mic}, monitor {mon.DeviceName} (virtual {mon.Width}x{mon.Height}, physical {mon.PhysicalWidth}x{mon.PhysicalHeight}) ===");
                 var enc = new ScreenRecorder.Encoder.ScreenEncoder();
                 enc.Start(eo.Format, eo.Output, eo.VideoCodec, 8_000_000, eo.AudioCodec, 160_000,
@@ -517,5 +562,41 @@ namespace ScreenRecorder.EncoderHarness
 
             return o;
         }
+
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+            string StringSecurityDescriptor,
+            uint StringSDRevision,
+            out IntPtr SecurityDescriptor,
+            out uint SecurityDescriptorSize);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool SetKernelObjectSecurity(
+            IntPtr handle,
+            int securityInformation,
+            IntPtr pSecurityDescriptor);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool GetKernelObjectSecurity(
+            IntPtr handle,
+            int securityInformation,
+            IntPtr pSecurityDescriptor,
+            uint nLength,
+            out uint lpnLengthNeeded);
+
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool ConvertSecurityDescriptorToStringSecurityDescriptor(
+            IntPtr SecurityDescriptor,
+            uint RequestedStringSDRevision,
+            int SecurityInformation,
+            out IntPtr StringSecurityDescriptor,
+            out uint StringSecurityDescriptorLen);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
     }
 }
+

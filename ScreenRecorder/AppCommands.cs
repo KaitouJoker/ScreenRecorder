@@ -370,9 +370,16 @@ namespace ScreenRecorder
                                     quality,
                                     nvencOptions);
                             }
-                            catch
+                            catch (Exception ex)
                             {
-                                MessageBox.Show(Properties.Resources.FailedToStartRecording,
+                                try
+                                {
+                                    var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "record_error.log");
+                                    System.IO.File.WriteAllText(logPath, $"[Record Start Error {DateTime.Now}]:\n{ex}");
+                                }
+                                catch { }
+
+                                MessageBox.Show($"{Properties.Resources.FailedToStartRecording}\n\n({ex.Message})",
                                     AppConstants.AppName,
                                     MessageBoxButton.OK, MessageBoxImage.Error);
                             }

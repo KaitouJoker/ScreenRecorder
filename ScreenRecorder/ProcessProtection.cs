@@ -9,6 +9,22 @@ namespace ScreenRecorder
         private const int DACL_SECURITY_INFORMATION = 0x00000004;
         private const uint PROCESS_ALL_ACCESS = 0x1F0FFF;
 
+        [DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool GetKernelObjectSecurity(
+            IntPtr handle,
+            int securityInformation,
+            IntPtr pSecurityDescriptor,
+            uint nLength,
+            out uint lpnLengthNeeded);
+
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool ConvertSecurityDescriptorToStringSecurityDescriptor(
+            IntPtr SecurityDescriptor,
+            uint RequestedStringSDRevision,
+            int SecurityInformation,
+            out IntPtr StringSecurityDescriptor,
+            out uint StringSecurityDescriptorLen);
+
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
             string StringSecurityDescriptor,
@@ -30,7 +46,9 @@ namespace ScreenRecorder
 
         /// <summary>
         /// Denies PROCESS_TERMINATE to prevent external anti-capture/DRM processes
-        /// (e.g. StarPlayerAgent's TerminateProcess) from forcibly killing ScreenRecorder.
+        /// (e.g. StarPlayerAgent's TerminateProcess) from forcibly killing ScreenRecorder,
+        /// while preserving all existing Allow ACEs so that DWM, DirectX, and Windows subsystems
+        /// can continue normal process and capture operations.
         /// </summary>
         public static bool ProtectFromTermination()
         {
@@ -43,10 +61,42 @@ namespace ScreenRecorder
 
                 try
                 {
-                    // D:(D;;0x0001;;;WD): Deny PROCESS_TERMINATE (0x0001) to Everyone (WD)
-                    if (ConvertStringSecurityDescriptorToSecurityDescriptor("D:(D;;0x0001;;;WD)", 1, out IntPtr pSD, out _))
+                    string origDacl = null;
+                    if (GetKernelObjectSecurity(hProcess, DACL_SECURITY_INFORMATION, IntPtr.Zero, 0, out uint needed) || needed > 0)
                     {
-                        return SetKernelObjectSecurity(hProcess, DACL_SECURITY_INFORMATION, pSD);
+                        IntPtr pSD = Marshal.AllocHGlobal((int)needed);
+                        try
+                        {
+                            if (GetKernelObjectSecurity(hProcess, DACL_SECURITY_INFORMATION, pSD, needed, out _))
+                            {
+                                if (ConvertSecurityDescriptorToStringSecurityDescriptor(pSD, 1, DACL_SECURITY_INFORMATION, out IntPtr strSD, out _))
+                                {
+                                    origDacl = Marshal.PtrToStringUni(strSD);
+                                    Marshal.FreeHGlobal(strSD);
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            Marshal.FreeHGlobal(pSD);
+                        }
+                    }
+
+                    string newSddl;
+                    if (!string.IsNullOrEmpty(origDacl) && origDacl.StartsWith("D:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Prepend Deny PROCESS_TERMINATE (0x0001) to Everyone (WD) before existing Allow ACEs
+                        newSddl = "D:(D;;0x0001;;;WD)" + origDacl.Substring(2);
+                    }
+                    else
+                    {
+                        // Fallback: Deny PROCESS_TERMINATE to Everyone, but explicitly Allow Owner, Interactive User, System, Administrators
+                        newSddl = "D:(D;;0x0001;;;WD)(A;;GA;;;OW)(A;;GA;;;IU)(A;;GA;;;SY)(A;;GA;;;BA)";
+                    }
+
+                    if (ConvertStringSecurityDescriptorToSecurityDescriptor(newSddl, 1, out IntPtr newSD, out _))
+                    {
+                        return SetKernelObjectSecurity(hProcess, DACL_SECURITY_INFORMATION, newSD);
                     }
                 }
                 finally
@@ -54,7 +104,10 @@ namespace ScreenRecorder
                     CloseHandle(hProcess);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ProcessProtection Exception]: {ex.Message}");
+            }
             return false;
         }
     }
