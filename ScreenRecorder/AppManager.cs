@@ -233,6 +233,13 @@ namespace ScreenRecorder
 
         public void ShowToast(string message, int durationMs = 5000)
         {
+            // 스텔스 모드에서는 anti-layerd-window 탐지를 회피하기 위해 팝업(WS_EX_LAYERED)을 화면에 띄우지 않음
+            if (AppConfig.Instance.EnableStealthMode)
+            {
+                System.Diagnostics.Debug.WriteLine($"[StealthMode Toast Suppressed]: {message}");
+                return;
+            }
+
             System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
             {
                 _toastCts?.Cancel();

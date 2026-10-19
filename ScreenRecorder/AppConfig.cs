@@ -107,6 +107,9 @@ namespace ScreenRecorder
                 config.Add(nameof(NvencBFrames), NvencBFrames.ToString());
                 config.Add(nameof(NvencBFrameRefMode), NvencBFrameRefMode);
 
+                config.Add(nameof(EnableStealthMode), EnableStealthMode.ToString());
+                config.Add(nameof(StealthWindowTitle), StealthWindowTitle ?? string.Empty);
+
                 Config.Config.SaveToFile(filePath, config);
             }
         }
@@ -155,6 +158,9 @@ namespace ScreenRecorder
                     NvencAdaptiveQuantization = Config.Config.GetBool(config, nameof(NvencAdaptiveQuantization), true);
                     NvencBFrames = Config.Config.GetInt32(config, nameof(NvencBFrames), 0);
                     NvencBFrameRefMode = Config.Config.GetString(config, nameof(NvencBFrameRefMode), "disabled");
+
+                    EnableStealthMode = Config.Config.GetBool(config, nameof(EnableStealthMode), false);
+                    StealthWindowTitle = Config.Config.GetString(config, nameof(StealthWindowTitle), "Display Host");
                 }
                 else
                 {
@@ -201,6 +207,9 @@ namespace ScreenRecorder
             NvencAdaptiveQuantization = true;
             NvencBFrames = 0;
             NvencBFrameRefMode = "disabled";
+
+            EnableStealthMode = false;
+            StealthWindowTitle = "Display Host";
         }
 
         #endregion
@@ -421,6 +430,22 @@ namespace ScreenRecorder
         {
             get => _excludeFromCapture;
             set => SetProperty(ref _excludeFromCapture, value);
+        }
+
+        private bool _enableStealthMode;
+
+        public bool EnableStealthMode
+        {
+            get => _enableStealthMode;
+            set => SetProperty(ref _enableStealthMode, value);
+        }
+
+        private string _stealthWindowTitle = "Display Host";
+
+        public string StealthWindowTitle
+        {
+            get => _stealthWindowTitle;
+            set => SetProperty(ref _stealthWindowTitle, value);
         }
 
         #endregion

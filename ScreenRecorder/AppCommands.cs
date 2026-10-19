@@ -260,6 +260,14 @@ namespace ScreenRecorder
                                     break;
                                 case CaptureTarget.ByUserChoiceTargetDeviceName:
                                     #region Select Region
+                                    if (AppConfig.Instance.EnableStealthMode)
+                                    {
+                                        // 스텔스 모드에서는 StarPlayer의 anti-layerd-window(WS_EX_LAYERED 탐지)를 회피하기 위해
+                                        // 화면 전체를 덮는 투명 레이어드 창(RegionSelectorWindow)을 띄우지 않고 주 모니터 전체를 녹화합니다.
+                                        displayDeviceName = System.Windows.Forms.Screen.PrimaryScreen.DeviceName;
+                                        break;
+                                    }
+
                                     var regionSelectorSession = new Region.RegionSelectorSession();
                                     try
                                     {

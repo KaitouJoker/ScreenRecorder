@@ -378,4 +378,10 @@
   <data name="Close" xml:space="preserve">
     <value>닫기</value>
   </data>
+  <data name="StealthMode" xml:space="preserve">
+    <value>보안 플레이어 충돌 방지 (스텔스 모드)</value>
+  </data>
+  <data name="StealthMode_ToolTip" xml:space="preserve">
+    <value>StarPlayer 등 보안 플레이어의 감시 및 재생 차단을 회피하기 위해 투명 레이어드 창, 디스플레이 어피니티, 오버레이를 배제하고 안전하게 녹화합니다.</value>
+  </data>
 </root>

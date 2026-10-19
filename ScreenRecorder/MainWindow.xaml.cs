@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
@@ -15,6 +15,30 @@ namespace ScreenRecorder
         public MainWindow()
         {
             InitializeComponent();
+            UpdateStealthWindowTitle();
+
+            AppConfig.Instance.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(AppConfig.EnableStealthMode) ||
+                    e.PropertyName == nameof(AppConfig.StealthWindowTitle))
+                {
+                    Dispatcher.Invoke(UpdateStealthWindowTitle);
+                }
+            };
+        }
+
+        private void UpdateStealthWindowTitle()
+        {
+            if (AppConfig.Instance.EnableStealthMode)
+            {
+                Title = string.IsNullOrWhiteSpace(AppConfig.Instance.StealthWindowTitle)
+                    ? "Display Host"
+                    : AppConfig.Instance.StealthWindowTitle;
+            }
+            else
+            {
+                Title = string.Empty;
+            }
         }
     }
 }

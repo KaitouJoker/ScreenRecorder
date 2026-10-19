@@ -378,4 +378,10 @@
   <data name="Close" xml:space="preserve">
     <value>Close</value>
   </data>
+  <data name="StealthMode" xml:space="preserve">
+    <value>Anti-Collision Stealth Mode</value>
+  </data>
+  <data name="StealthMode_ToolTip" xml:space="preserve">
+    <value>Avoids playback interruption and detection by DRM/security players (e.g. StarPlayer) by suppressing layered transparent windows, display affinities, and overlays.</value>
+  </data>
 </root>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -39,6 +39,16 @@ namespace ScreenRecorder
         {
             if (_windowHandle == IntPtr.Zero)
                 return;
+
+            // 스텔스 모드(보안 플레이어 충돌 방지)에서는 SetWindowDisplayAffinity를 호출하지 않음 (StarPlayer의 GetWindowDisplayAffinity 탐지 방지)
+            if (AppConfig.Instance.EnableStealthMode)
+            {
+                if (Utils.IsWindowDisplayedOnlyMonitor(_windowHandle))
+                {
+                    Utils.SetWindowDisplayedOnlyMonitor(_windowHandle, false);
+                }
+                return;
+            }
 
             var isWindowDisplayedOnlyMonitor = Utils.IsWindowDisplayedOnlyMonitor(_windowHandle);
             if (excludeFromCapture != isWindowDisplayedOnlyMonitor)

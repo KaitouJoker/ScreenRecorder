@@ -842,5 +842,23 @@ namespace ScreenRecorder.Properties {
                 return ResourceManager.GetString("Close", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Anti-Collision Stealth Mode
+        /// </summary>
+        public static string StealthMode {
+            get {
+                return ResourceManager.GetString("StealthMode", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Avoids playback interruption and detection by DRM/security players (e.g. StarPlayer) by suppressing layered transparent windows, display affinities, and overlays.
+        /// </summary>
+        public static string StealthMode_ToolTip {
+            get {
+                return ResourceManager.GetString("StealthMode_ToolTip", resourceCulture);
+            }
+        }
     }
 }
