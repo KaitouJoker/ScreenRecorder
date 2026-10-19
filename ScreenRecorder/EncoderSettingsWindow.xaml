@@ -29,6 +29,11 @@
             <Setter Property="Margin" Value="4 3 4 3" />
             <Setter Property="Height" Value="24" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="#111111" />
+        </Style>
+
+        <Style TargetType="{x:Type ComboBoxItem}">
+            <Setter Property="Foreground" Value="#111111" />
         </Style>
 
         <Style TargetType="{x:Type GroupBox}">
@@ -280,6 +285,8 @@
                 <ComboBox
                     Grid.Row="2" Grid.Column="1"
                     ItemsSource="{Binding BFrameCounts}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
                     SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencBFrames, Mode=TwoWay}"
                     />
 

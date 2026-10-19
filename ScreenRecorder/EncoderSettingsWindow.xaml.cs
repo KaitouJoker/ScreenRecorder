@@ -26,7 +26,7 @@ namespace ScreenRecorder
         public List<SettingComboItem<string>> Tunings { get; }
         public List<SettingComboItem<string>> MultipassModes { get; }
         public List<SettingComboItem<string>> Profiles { get; }
-        public List<int> BFrameCounts { get; }
+        public List<SettingComboItem<int>> BFrameCounts { get; }
         public List<SettingComboItem<string>> BFrameRefModes { get; }
 
         public EncoderSettingsWindow()
@@ -104,7 +104,14 @@ namespace ScreenRecorder
                 new SettingComboItem<string>("baseline", "baseline"),
             };
 
-            BFrameCounts = new List<int> { 0, 1, 2, 3, 4 };
+            BFrameCounts = new List<SettingComboItem<int>>
+            {
+                new SettingComboItem<int>("0", 0),
+                new SettingComboItem<int>("1", 1),
+                new SettingComboItem<int>("2", 2),
+                new SettingComboItem<int>("3", 3),
+                new SettingComboItem<int>("4", 4),
+            };
 
             BFrameRefModes = new List<SettingComboItem<string>>
             {
