@@ -35,7 +35,8 @@ namespace ScreenRecorder.VideoSource
 
         public void Run(CancellationToken ct)
         {
-            long lastFrameTicks = Stopwatch.GetTimestamp();
+            long startTicks = Stopwatch.GetTimestamp();
+            long lastFrameTicks = startTicks;
             long k = 0;
 
             while (!ct.IsCancellationRequested)
@@ -55,7 +56,7 @@ namespace ScreenRecorder.VideoSource
                     _pauseStart = 0;
                 }
 
-                _onTick(_t0 + k * _interval, k, false);
+                _onTick(startTicks + k * _interval, k, false);
 
                 long target = lastFrameTicks + _interval;
                 if (QpcSleep.SleepToTicks(target, ct))
@@ -70,7 +71,7 @@ namespace ScreenRecorder.VideoSource
                     long count = diff / _interval; // >= 1
                     long dupes = Math.Min(count - 1, 3);
                     for (long i = 1; i <= dupes && !ct.IsCancellationRequested; i++)
-                        _onTick(_t0 + (k + i) * _interval, k + i, true); // duplicate held frame
+                        _onTick(startTicks + (k + i) * _interval, k + i, true); // duplicate held frame
 
                     Interlocked.Add(ref _dropped, count - 1);
                     k += count;

@@ -120,6 +120,7 @@ namespace ScreenRecorder.AudioSource
 
         private void PushLoop(CancellationToken ct)
         {
+            long startTicks = Stopwatch.GetTimestamp();
             long cumulative = 0;
             short[] s16 = new short[Block * OutChannels];
 
@@ -140,12 +141,12 @@ namespace ScreenRecorder.AudioSource
                     _pauseStart = 0;
                 }
 
-                long target = _t0 + _pacingOffset + AudioHelper.GetDurationFromSamples(cumulative + Block, OutRate);
+                long target = startTicks + _pacingOffset + AudioHelper.GetDurationFromSamples(cumulative + Block, OutRate);
                 QpcSleep.SleepToTicks(target, ct);
                 if (ct.IsCancellationRequested)
                     break;
 
-                long blockTs = _t0 + AudioHelper.GetDurationFromSamples(cumulative, OutRate);
+                long blockTs = startTicks + AudioHelper.GetDurationFromSamples(cumulative, OutRate);
                 _mixer.MixBlock(s16, Block);
 
                 fixed (short* p = s16)

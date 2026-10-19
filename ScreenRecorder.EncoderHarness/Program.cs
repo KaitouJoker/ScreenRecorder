@@ -219,12 +219,18 @@ namespace ScreenRecorder.EncoderHarness
 
                 var info = MediaFileVerifier.Probe(eo.Output);
                 Console.WriteLine($"  streams={info.StreamCount} video={info.VideoCodec} {info.Width}x{info.Height} audio={info.AudioCodec} " +
-                                  $"vPackets={info.VideoPacketCount} dur={info.DurationSeconds:0.000}s");
+                                  $"vPackets={info.VideoPacketCount} aPackets={info.AudioPacketCount} dur={info.DurationSeconds:0.000}s " +
+                                  $"firstV={info.FirstVideoPtsSeconds:0.000}s firstA={info.FirstAudioPtsSeconds:0.000}s");
                 info.Check(info.StreamCount == (eo.AudioCodec == MediaEncoder.AudioCodec.None ? 1 : 2), "stream count matches");
                 string expectedV = eo.VideoCodec == MediaEncoder.VideoCodec.AV1 ? "av1" : eo.VideoCodec == MediaEncoder.VideoCodec.Hevc ? "hevc" : "h264";
                 info.Check(info.VideoCodec == expectedV, $"video codec {expectedV}");
                 info.Check(info.VideoPacketCount > eo.Fps, "recorded multiple seconds of frames");
                 info.Check(info.DurationSeconds > 1.0, "duration > 1s");
+                if (eo.AudioCodec != MediaEncoder.AudioCodec.None)
+                {
+                    info.Check(!double.IsNaN(info.FirstAudioPtsSeconds) && Math.Abs(info.FirstVideoPtsSeconds - info.FirstAudioPtsSeconds) < 0.05,
+                        $"A/V start aligned (<50ms) (v={info.FirstVideoPtsSeconds:0.000}s, a={info.FirstAudioPtsSeconds:0.000}s)");
+                }
                 Console.WriteLine(info.Ok ? "RESULT: ALL CHECKS PASSED" : "RESULT: FAILED");
                 return info.Ok ? 0 : 1;
             }

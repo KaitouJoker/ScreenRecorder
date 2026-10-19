@@ -86,6 +86,9 @@ namespace ScreenRecorder.Encoder
         private Thread _audioThread;
         private Thread _muxThread;
 
+        private readonly ManualResetEventSlim _vStartEvent = new ManualResetEventSlim(false);
+        private long _vStartTs = long.MinValue;
+
         private long _droppedFrames;
         private long _recordedVideoFrames;
         private bool _started;
@@ -178,7 +181,6 @@ namespace ScreenRecorder.Encoder
         {
             try
             {
-                long t0 = long.MinValue;
                 long fpsNum = _videoParams.FpsNumerator;
                 long fpsDen = _videoParams.FpsDenominator;
                 long freq = Stopwatch.Frequency;
@@ -188,10 +190,13 @@ namespace ScreenRecorder.Encoder
 
                 foreach (var frame in _videoIn.GetConsumingEnumerable())
                 {
-                    if (t0 == long.MinValue)
-                        t0 = frame.TimestampQpc;
+                    if (_vStartTs == long.MinValue)
+                    {
+                        _vStartTs = frame.TimestampQpc;
+                        _vStartEvent.Set();
+                    }
 
-                    long gridIndex = (long)Math.Round((double)(frame.TimestampQpc - t0) * fpsNum / (fpsDen * freq));
+                    long gridIndex = (long)Math.Round((double)(frame.TimestampQpc - _vStartTs) * fpsNum / (fpsDen * freq));
 
                     planes[0] = (byte*)frame.Data;
                     planes[1] = (byte*)(frame.Data + (nint)frame.Stride * frame.Height);
@@ -230,9 +235,65 @@ namespace ScreenRecorder.Encoder
             try
             {
                 byte** planes = stackalloc byte*[1];
+                long freq = Stopwatch.Frequency;
+                bool audioStarted = false;
+
+                // Wait until video has captured its first frame and established _vStartTs
+                while (_vStartTs == long.MinValue && !_videoIn.IsAddingCompleted && !_audioIn.IsAddingCompleted)
+                {
+                    _vStartEvent.Wait(10);
+                }
+
+                long vStart = _vStartTs;
 
                 foreach (var frame in _audioIn.GetConsumingEnumerable())
                 {
+                    if (vStart != long.MinValue && !audioStarted)
+                    {
+                        long frameDurTicks = (long)frame.Samples * freq / frame.SampleRate;
+                        long frameEndTicks = frame.TimestampQpc + frameDurTicks;
+
+                        // Entire audio block occurred before video started: discard.
+                        if (frameEndTicks <= vStart)
+                        {
+                            _audioFramePool.Return(frame.Data);
+                            continue;
+                        }
+
+                        // Audio block straddles vStart: trim the pre-video portion.
+                        if (frame.TimestampQpc < vStart)
+                        {
+                            long skipTicks = vStart - frame.TimestampQpc;
+                            int skipSamples = (int)Math.Round((double)skipTicks * frame.SampleRate / freq);
+                            skipSamples = Math.Clamp(skipSamples, 0, frame.Samples - 1);
+                            int keepSamples = frame.Samples - skipSamples;
+
+                            int bytesPerSample = frame.Format == SampleFormat.S16 ? 2 : frame.Format == SampleFormat.S32 || frame.Format == SampleFormat.FLT ? 4 : 1;
+                            int offsetBytes = skipSamples * frame.Channels * bytesPerSample;
+
+                            planes[0] = (byte*)(frame.Data + offsetBytes);
+                            _audioEncoder.Accept(planes, 1, keepSamples);
+
+                            while (_audioEncoder.TrySendNextFrame())
+                                DrainAudio();
+
+                            audioStarted = true;
+                            _audioFramePool.Return(frame.Data);
+                            continue;
+                        }
+                        else
+                        {
+                            // First audio block arrived after vStart: pad silence for the gap so audio PTS 0 matches vStart.
+                            long gapTicks = frame.TimestampQpc - vStart;
+                            int gapSamples = (int)Math.Round((double)gapTicks * frame.SampleRate / freq);
+                            if (gapSamples > 0)
+                            {
+                                FeedSilence(gapSamples);
+                            }
+                            audioStarted = true;
+                        }
+                    }
+
                     planes[0] = (byte*)frame.Data;
                     _audioEncoder.Accept(planes, 1, frame.Samples);
 
@@ -248,6 +309,30 @@ namespace ScreenRecorder.Encoder
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[AudioLoop EXCEPTION] {ex}");
+            }
+        }
+
+        private void FeedSilence(int samples)
+        {
+            if (_audioParams == null || _audioEncoder == null || samples <= 0)
+                return;
+
+            int bytesPerSample = _audioParams.Format == SampleFormat.S16 ? 2 : _audioParams.Format == SampleFormat.S32 || _audioParams.Format == SampleFormat.FLT ? 4 : 1;
+            int chunk = Math.Min(samples, 1024);
+            byte[] zeroBuf = new byte[chunk * _audioParams.Channels * bytesPerSample];
+            fixed (byte* p = zeroBuf)
+            {
+                byte** planes = stackalloc byte*[1];
+                planes[0] = p;
+                int remaining = samples;
+                while (remaining > 0)
+                {
+                    int toSend = Math.Min(remaining, chunk);
+                    _audioEncoder.Accept(planes, 1, toSend);
+                    while (_audioEncoder.TrySendNextFrame())
+                        DrainAudio();
+                    remaining -= toSend;
+                }
             }
         }
 
@@ -288,6 +373,8 @@ namespace ScreenRecorder.Encoder
             if (!_started)
                 return;
 
+            _vStartEvent.Set();
+
             _videoIn.CompleteAdding();
             _audioIn.CompleteAdding();
 
@@ -310,6 +397,7 @@ namespace ScreenRecorder.Encoder
 
             Stop();
 
+            _vStartEvent.Dispose();
             _videoIn.Dispose();
             _audioIn.Dispose();
             _encodedOut.Dispose();
