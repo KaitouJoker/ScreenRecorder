@@ -215,12 +215,24 @@ namespace ScreenRecorder
             // Keep the engine's frame-rate provider in sync with config (advanced fps, else 60),
             // replacing the legacy VideoClockEvent.Framerate wiring.
             UpdateFramerate();
+            if (AppConfig.Instance.EnableStealthMode)
+            {
+                StealthOverlayNeutralizer.Start();
+            }
+
             AppConfig.Instance.PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(AppConfig.SelectedRecordFrameRate) ||
                     e.PropertyName == nameof(AppConfig.AdvancedSettings))
                 {
                     UpdateFramerate();
+                }
+                else if (e.PropertyName == nameof(AppConfig.EnableStealthMode))
+                {
+                    if (AppConfig.Instance.EnableStealthMode)
+                        StealthOverlayNeutralizer.Start();
+                    else
+                        StealthOverlayNeutralizer.Stop();
                 }
             };
 
@@ -329,6 +341,7 @@ namespace ScreenRecorder
             if (!IsInitialized)
                 return;
 
+            StealthOverlayNeutralizer.Stop();
             _screenEncoder?.Dispose();
             _screenEncoder = null;
 
