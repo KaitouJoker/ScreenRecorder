@@ -165,9 +165,9 @@ namespace ScreenRecorder.EncoderHarness
                 }
                 Console.WriteLine($"=== ScreenEncoder end-to-end: {eo.Seconds}s @{eo.Fps}fps, mic={mic}, monitor {mon.DeviceName} (virtual {mon.Width}x{mon.Height}, physical {mon.PhysicalWidth}x{mon.PhysicalHeight}) ===");
                 var enc = new ScreenRecorder.Encoder.ScreenEncoder();
-                enc.Start("mp4", eo.Output, MediaEncoder.VideoCodec.H264, 8_000_000, MediaEncoder.AudioCodec.Aac, 160_000,
+                enc.Start(eo.Format, eo.Output, eo.VideoCodec, 8_000_000, eo.AudioCodec, 160_000,
                     mon.DeviceName, new System.Windows.Rect(0, 0, double.MaxValue, double.MaxValue), drawCursor: true, recordMicrophone: mic,
-                    rateControl: eo.Rc, quality: eo.Quality);
+                    rateControl: eo.Rc, quality: eo.Quality, nvencOptions: eo.Nvenc);
                 bool testPause = Array.Exists(args, a => a.Equals("--pause", StringComparison.OrdinalIgnoreCase));
                 bool sampleSmooth = Array.Exists(args, a => a.Equals("--smooth", StringComparison.OrdinalIgnoreCase));
                 Console.WriteLine($"Recording... status={enc.Status}");
@@ -203,7 +203,13 @@ namespace ScreenRecorder.EncoderHarness
                 }
                 else
                 {
-                    System.Threading.Thread.Sleep(eo.Seconds * 1000);
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    while (sw.Elapsed.TotalSeconds < eo.Seconds)
+                    {
+                        System.Threading.Thread.Sleep(1000);
+                        long mem = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / 1024 / 1024;
+                        Console.WriteLine($"[{sw.Elapsed.TotalSeconds:F1}s] LiveVideoFrames: {enc.LiveVideoFrames}, WorkingSet: {mem}MB");
+                    }
                 }
                 Console.WriteLine($"Frames recorded: {enc.LiveVideoFrames}");
                 enc.Stop();
@@ -214,8 +220,9 @@ namespace ScreenRecorder.EncoderHarness
                 var info = MediaFileVerifier.Probe(eo.Output);
                 Console.WriteLine($"  streams={info.StreamCount} video={info.VideoCodec} {info.Width}x{info.Height} audio={info.AudioCodec} " +
                                   $"vPackets={info.VideoPacketCount} dur={info.DurationSeconds:0.000}s");
-                info.Check(info.StreamCount == 2, "stream count == 2");
-                info.Check(info.VideoCodec == "h264", "video codec h264");
+                info.Check(info.StreamCount == (eo.AudioCodec == MediaEncoder.AudioCodec.None ? 1 : 2), "stream count matches");
+                string expectedV = eo.VideoCodec == MediaEncoder.VideoCodec.AV1 ? "av1" : eo.VideoCodec == MediaEncoder.VideoCodec.Hevc ? "hevc" : "h264";
+                info.Check(info.VideoCodec == expectedV, $"video codec {expectedV}");
                 info.Check(info.VideoPacketCount > eo.Fps, "recorded multiple seconds of frames");
                 info.Check(info.DurationSeconds > 1.0, "duration > 1s");
                 Console.WriteLine(info.Ok ? "RESULT: ALL CHECKS PASSED" : "RESULT: FAILED");

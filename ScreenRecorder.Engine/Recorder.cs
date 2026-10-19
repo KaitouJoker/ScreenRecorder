@@ -145,8 +145,14 @@ namespace ScreenRecorder.Encoder
             if (!_started || _videoIn.IsAddingCompleted)
                 return;
 
-            // P1: no drop (deterministic harness output). The live-capture drop/backpressure
-            // policy lands in P4 when a real WGC source can outrun the encoder.
+            // Live-capture backpressure: if encoder is lagging behind by more than 10 frames (~160ms),
+            // drop the incoming frame to prevent memory ballooning and queue stalls.
+            if (_videoIn.Count >= 10)
+            {
+                Interlocked.Increment(ref _droppedFrames);
+                return;
+            }
+
             int frameBytes = frame.Stride * frame.Height + frame.Stride * (frame.Height / 2); // NV12
             nint buffer = _videoFramePool.Rent(frameBytes);
             Unsafe.CopyBlockUnaligned((void*)buffer, (void*)frame.Data, (uint)frameBytes);
@@ -170,34 +176,41 @@ namespace ScreenRecorder.Encoder
 
         private void VideoLoop()
         {
-            long t0 = long.MinValue;
-            long fpsNum = _videoParams.FpsNumerator;
-            long fpsDen = _videoParams.FpsDenominator;
-            long freq = Stopwatch.Frequency;
-
-            byte** planes = stackalloc byte*[2];
-            int* linesizes = stackalloc int[2];
-
-            foreach (var frame in _videoIn.GetConsumingEnumerable())
+            try
             {
-                if (t0 == long.MinValue)
-                    t0 = frame.TimestampQpc;
+                long t0 = long.MinValue;
+                long fpsNum = _videoParams.FpsNumerator;
+                long fpsDen = _videoParams.FpsDenominator;
+                long freq = Stopwatch.Frequency;
 
-                long gridIndex = (long)Math.Round((double)(frame.TimestampQpc - t0) * fpsNum / (fpsDen * freq));
+                byte** planes = stackalloc byte*[2];
+                int* linesizes = stackalloc int[2];
 
-                planes[0] = (byte*)frame.Data;
-                planes[1] = (byte*)(frame.Data + (nint)frame.Stride * frame.Height);
-                linesizes[0] = frame.Stride;
-                linesizes[1] = frame.Stride;
+                foreach (var frame in _videoIn.GetConsumingEnumerable())
+                {
+                    if (t0 == long.MinValue)
+                        t0 = frame.TimestampQpc;
 
-                _videoEncoder.SendFrame(planes, linesizes, 2, gridIndex);
+                    long gridIndex = (long)Math.Round((double)(frame.TimestampQpc - t0) * fpsNum / (fpsDen * freq));
+
+                    planes[0] = (byte*)frame.Data;
+                    planes[1] = (byte*)(frame.Data + (nint)frame.Stride * frame.Height);
+                    linesizes[0] = frame.Stride;
+                    linesizes[1] = frame.Stride;
+
+                    _videoEncoder.SendFrame(planes, linesizes, 2, gridIndex);
+                    DrainVideo();
+
+                    _videoFramePool.Return(frame.Data);
+                }
+
+                _videoEncoder.FlushSend();
                 DrainVideo();
-
-                _videoFramePool.Return(frame.Data);
             }
-
-            _videoEncoder.FlushSend();
-            DrainVideo();
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[VideoLoop EXCEPTION] {ex}");
+            }
         }
 
         private void DrainVideo()
@@ -214,21 +227,28 @@ namespace ScreenRecorder.Encoder
 
         private void AudioLoop()
         {
-            byte** planes = stackalloc byte*[1];
-
-            foreach (var frame in _audioIn.GetConsumingEnumerable())
+            try
             {
-                planes[0] = (byte*)frame.Data;
-                _audioEncoder.Accept(planes, 1, frame.Samples);
+                byte** planes = stackalloc byte*[1];
 
-                while (_audioEncoder.TrySendNextFrame())
-                    DrainAudio();
+                foreach (var frame in _audioIn.GetConsumingEnumerable())
+                {
+                    planes[0] = (byte*)frame.Data;
+                    _audioEncoder.Accept(planes, 1, frame.Samples);
 
-                _audioFramePool.Return(frame.Data);
+                    while (_audioEncoder.TrySendNextFrame())
+                        DrainAudio();
+
+                    _audioFramePool.Return(frame.Data);
+                }
+
+                _audioEncoder.Flush();
+                DrainAudio();
             }
-
-            _audioEncoder.Flush();
-            DrainAudio();
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[AudioLoop EXCEPTION] {ex}");
+            }
         }
 
         private void DrainAudio()
@@ -245,14 +265,21 @@ namespace ScreenRecorder.Encoder
 
         private void MuxLoop()
         {
-            foreach (var q in _encodedOut.GetConsumingEnumerable())
+            try
             {
-                if (q.IsVideo)
-                    _container.WriteVideoPacket(new EncodedVideoPacket(q.Pts, q.Dts, q.Data, q.Size, q.IsKey));
-                else
-                    _container.WriteAudioPacket(new EncodedAudioPacket(q.Pts, q.Dts, q.Data, q.Size));
+                foreach (var q in _encodedOut.GetConsumingEnumerable())
+                {
+                    if (q.IsVideo)
+                        _container.WriteVideoPacket(new EncodedVideoPacket(q.Pts, q.Dts, q.Data, q.Size, q.IsKey));
+                    else
+                        _container.WriteAudioPacket(new EncodedAudioPacket(q.Pts, q.Dts, q.Data, q.Size));
 
-                _packetPool.Return(q.Data);
+                    _packetPool.Return(q.Data);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MuxLoop EXCEPTION] {ex}");
             }
         }
 

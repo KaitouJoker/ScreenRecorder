@@ -12,14 +12,12 @@ using ScreenRecorder.DirectX;
 namespace ScreenRecorder.VideoSource
 {
     /// <summary>
-    /// Windows.Graphics.Capture session. FrameArrived (on a free-threaded pool thread) copies the
-    /// captured BGRA texture into a device-owned "latest" texture; the paced capture thread later
-    /// pulls the crop out of it via <see cref="TryCopyLatest"/>. The recorder's immediate context
-    /// is multithread-protected, so the cross-thread copies are safe.
+    /// Windows.Graphics.Capture session. Frames are polled directly by the paced capture thread
+    /// on each tick via <see cref="TryCopyLatest"/>, ensuring all Direct3D context operations
+    /// occur exclusively on that single thread without cross-thread serialization or deadlocks.
     /// </summary>
     internal sealed class WgcCapture : IDisposable
     {
-        private readonly object _lock = new object();
         private readonly Direct3D11Device _device;
         private readonly bool _drawCursor;
 
@@ -48,7 +46,6 @@ namespace ScreenRecorder.VideoSource
             _winrtDevice = WgcInterop.CreateWinRtDevice(device.Device);
             _framePool = Direct3D11CaptureFramePool.CreateFreeThreaded(
                 _winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _size);
-            _framePool.FrameArrived += OnFrameArrived;
             _session = _framePool.CreateCaptureSession(item);
 
             if (ApiInformation.IsPropertyPresent("Windows.Graphics.Capture.GraphicsCaptureSession", "IsCursorCaptureEnabled"))
@@ -65,44 +62,51 @@ namespace ScreenRecorder.VideoSource
         }
 
         /// <summary>
-        /// Copies the crop region of the latest captured frame into <paramref name="dstRegion"/>.
-        /// Returns false if no frame has arrived yet.
+        /// Pulls the latest frame from the capture pool (if available), copies the crop region into
+        /// <paramref name="dstRegion"/>, and returns true if a frame was copied. If no new frame
+        /// arrived, re-uses the held latest frame.
+        /// Must be called exclusively from the capture clock thread.
         /// </summary>
         public bool TryCopyLatest(ID3D11DeviceContext context, ID3D11Texture2D dstRegion, in Box crop)
         {
-            lock (_lock)
-            {
-                if (!_hasFrame || _latestBgra == null)
-                    return false;
+            if (_disposed)
+                return false;
 
-                context.CopySubresourceRegion(dstRegion, 0, 0, 0, 0, _latestBgra, 0, crop);
-                return true;
+            // Drain any newly arrived frame from the pool.
+            Direct3D11CaptureFrame latestFrame = null;
+            while (true)
+            {
+                var next = _framePool.TryGetNextFrame();
+                if (next == null)
+                    break;
+
+                latestFrame?.Dispose();
+                latestFrame = next;
             }
-        }
 
-        private void OnFrameArrived(Direct3D11CaptureFramePool sender, object args)
-        {
-            using var frame = sender.TryGetNextFrame();
-            if (frame == null)
-                return;
-
-            lock (_lock)
+            if (latestFrame != null)
             {
-                if (_disposed)
-                    return;
-
-                if (frame.ContentSize.Width != _size.Width || frame.ContentSize.Height != _size.Height)
+                using (latestFrame)
                 {
-                    _size = frame.ContentSize;
-                    _latestBgra?.Dispose();
-                    _latestBgra = CreateBgraTexture(_size);
-                    _framePool.Recreate(_winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _size);
-                }
+                    if (latestFrame.ContentSize.Width != _size.Width || latestFrame.ContentSize.Height != _size.Height)
+                    {
+                        _size = latestFrame.ContentSize;
+                        _latestBgra?.Dispose();
+                        _latestBgra = CreateBgraTexture(_size);
+                        _framePool.Recreate(_winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _size);
+                    }
 
-                using var tex = WgcInterop.GetTexture(frame.Surface);
-                _device.Context.CopyResource(_latestBgra, tex);
-                _hasFrame = true;
+                    using var tex = WgcInterop.GetTexture(latestFrame.Surface);
+                    context.CopyResource(_latestBgra, tex);
+                    _hasFrame = true;
+                }
             }
+
+            if (!_hasFrame || _latestBgra == null)
+                return false;
+
+            context.CopySubresourceRegion(dstRegion, 0, 0, 0, 0, _latestBgra, 0, crop);
+            return true;
         }
 
         private ID3D11Texture2D CreateBgraTexture(SizeInt32 size)
@@ -125,20 +129,12 @@ namespace ScreenRecorder.VideoSource
 
         public void Dispose()
         {
-            lock (_lock)
-            {
-                if (_disposed)
-                    return;
-                _disposed = true;
-            }
+            if (_disposed)
+                return;
+            _disposed = true;
 
             _session?.Dispose();
-            if (_framePool != null)
-            {
-                _framePool.FrameArrived -= OnFrameArrived;
-                _framePool.Dispose();
-            }
-
+            _framePool?.Dispose();
             _latestBgra?.Dispose();
             _winrtDevice?.Dispose();
             _item = null;

@@ -119,15 +119,18 @@ namespace ScreenRecorder.VideoSource
 
         private void OnTick(long ptsQpc, long gridIndex, bool isDuplicate)
         {
-            if (!isDuplicate && _capture.TryCopyLatest(_device.Context, _regionTex, _crop))
+            if (!isDuplicate || !_hasHeld)
             {
-                if (_nv12.Convert(_regionTex, _outW, _outH, out nint plane, out int stride, out int slice))
+                if (_capture.TryCopyLatest(_device.Context, _regionTex, _crop))
                 {
-                    EnsureOutBuffer(slice);
-                    Unsafe.CopyBlockUnaligned((void*)_outBuffer, (void*)plane, (uint)slice);
-                    _nv12.Unmap();
-                    _lastStride = stride;
-                    _hasHeld = true;
+                    if (_nv12.Convert(_regionTex, _outW, _outH, out nint plane, out int stride, out int slice))
+                    {
+                        EnsureOutBuffer(slice);
+                        Unsafe.CopyBlockUnaligned((void*)_outBuffer, (void*)plane, (uint)slice);
+                        _nv12.Unmap();
+                        _lastStride = stride;
+                        _hasHeld = true;
+                    }
                 }
             }
 
@@ -153,7 +156,7 @@ namespace ScreenRecorder.VideoSource
         public void Stop()
         {
             _cts?.Cancel();
-            _thread?.Join(1000);
+            _thread?.Join();
             _thread = null;
         }
 

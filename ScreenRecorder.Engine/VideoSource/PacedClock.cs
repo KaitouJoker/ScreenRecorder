@@ -35,7 +35,7 @@ namespace ScreenRecorder.VideoSource
 
         public void Run(CancellationToken ct)
         {
-            long lastFrameTicks = _t0;
+            long lastFrameTicks = Stopwatch.GetTimestamp();
             long k = 0;
 
             while (!ct.IsCancellationRequested)
@@ -65,14 +65,16 @@ namespace ScreenRecorder.VideoSource
                 }
                 else
                 {
-                    long diff = Math.Max(Stopwatch.GetTimestamp() - lastFrameTicks, _interval);
+                    long now = Stopwatch.GetTimestamp();
+                    long diff = Math.Max(now - lastFrameTicks, _interval);
                     long count = diff / _interval; // >= 1
-                    for (long i = 1; i < count; i++)
+                    long dupes = Math.Min(count - 1, 3);
+                    for (long i = 1; i <= dupes && !ct.IsCancellationRequested; i++)
                         _onTick(_t0 + (k + i) * _interval, k + i, true); // duplicate held frame
 
                     Interlocked.Add(ref _dropped, count - 1);
                     k += count;
-                    lastFrameTicks += _interval * count;
+                    lastFrameTicks = now;
                 }
             }
         }

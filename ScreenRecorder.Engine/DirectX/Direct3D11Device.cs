@@ -16,6 +16,8 @@ namespace ScreenRecorder.DirectX
         public ID3D11DeviceContext Context { get; }
         public FeatureLevel FeatureLevel { get; }
 
+        public object ContextLock { get; } = new object();
+
         public Direct3D11Device(IDXGIAdapter adapter = null)
         {
             var flags = DeviceCreationFlags.BgraSupport | DeviceCreationFlags.VideoSupport;
@@ -33,11 +35,6 @@ namespace ScreenRecorder.DirectX
             Device = device;
             Context = context;
             FeatureLevel = featureLevel;
-
-            // WGC FrameArrived (pool thread) and the paced capture thread share this immediate
-            // context. Enable D3D11 internal serialization so concurrent context calls are safe.
-            using var multithread = context.QueryInterface<ID3D11Multithread>();
-            multithread.SetMultithreadProtected(true);
         }
 
         /// <summary>QI the DXGI device for the WGC WinRT device bridge.</summary>
