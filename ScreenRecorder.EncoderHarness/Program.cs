@@ -267,6 +267,7 @@ namespace ScreenRecorder.EncoderHarness
                 Bitrate = 5_000_000,
                 RateControl = opt.Rc,
                 Quality = opt.Quality,
+                NvencOptions = opt.Nvenc,
             };
 
             AudioParams audioParams = opt.AudioCodec == AudioCodec.None ? null : new AudioParams
@@ -347,7 +348,13 @@ namespace ScreenRecorder.EncoderHarness
             Console.WriteLine("=== Verification (in-process libavformat) ===");
             var info = MediaFileVerifier.Probe(opt.Output);
             bool hasAudio = opt.AudioCodec != AudioCodec.None;
-            string expectedVideo = opt.VideoCodec == VideoCodec.H264 ? "h264" : "hevc";
+            string expectedVideo = opt.VideoCodec switch
+            {
+                VideoCodec.H264 => "h264",
+                VideoCodec.H265 => "hevc",
+                VideoCodec.AV1 => "av1",
+                _ => "unknown"
+            };
             string expectedAudio = opt.AudioCodec == AudioCodec.Aac ? "aac" : "mp3";
 
             Console.WriteLine($"  streams={info.StreamCount} video={info.VideoCodec} {info.Width}x{info.Height} " +
@@ -388,6 +395,8 @@ namespace ScreenRecorder.EncoderHarness
             if (opt.VideoCodec == VideoCodec.H264)
                 return MediaWriter.IsSupportedNvencH264() ? HwAccel.Nvenc
                     : MediaWriter.IsSupportedQsvH264() ? HwAccel.Qsv : HwAccel.Software;
+            if (opt.VideoCodec == VideoCodec.AV1)
+                return MediaWriter.IsSupportedNvencAV1() ? HwAccel.Nvenc : HwAccel.Software;
             return MediaWriter.IsSupportedNvencHEVC() ? HwAccel.Nvenc
                 : MediaWriter.IsSupportedQsvHEVC() ? HwAccel.Qsv : HwAccel.Software;
         }
@@ -395,7 +404,14 @@ namespace ScreenRecorder.EncoderHarness
         private static void PrintEnvironment()
         {
             Console.WriteLine("=== FFmpeg ===");
-            Console.WriteLine("av_version_info : " + ffmpeg.av_version_info());
+            try
+            {
+                Console.WriteLine("av_version_info : " + ffmpeg.av_version_info());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("av_version_info failed: " + ex.Message);
+            }
             Console.WriteLine();
             Console.WriteLine("=== Hardware encoder probe ===");
             MediaWriter.CheckHardwareCodec();
@@ -403,6 +419,7 @@ namespace ScreenRecorder.EncoderHarness
             Console.WriteLine("  QSV   H264 : " + MediaWriter.IsSupportedQsvH264());
             Console.WriteLine("  NVENC HEVC : " + MediaWriter.IsSupportedNvencHEVC());
             Console.WriteLine("  QSV   HEVC : " + MediaWriter.IsSupportedQsvHEVC());
+            Console.WriteLine("  NVENC AV1  : " + MediaWriter.IsSupportedNvencAV1());
         }
 
         private sealed class Options
@@ -419,6 +436,7 @@ namespace ScreenRecorder.EncoderHarness
             public bool SmokeOnly;
             public RateControl Rc = RateControl.Cbr;
             public int Quality = 23;
+            public NvencOptions Nvenc;
         }
 
         [System.Runtime.InteropServices.DllImport("shcore.dll")]
@@ -456,13 +474,33 @@ namespace ScreenRecorder.EncoderHarness
             if (map.TryGetValue("fps", out var f)) o.Fps = int.Parse(f);
             if (map.TryGetValue("w", out var w)) o.Width = int.Parse(w);
             if (map.TryGetValue("h", out var h)) o.Height = int.Parse(h);
-            if (map.TryGetValue("codec", out var c)) o.VideoCodec = c.Equals("h265", StringComparison.OrdinalIgnoreCase) || c.Equals("hevc", StringComparison.OrdinalIgnoreCase) ? VideoCodec.Hevc : VideoCodec.H264;
+            if (map.TryGetValue("codec", out var c)) o.VideoCodec = c.Equals("av1", StringComparison.OrdinalIgnoreCase) ? VideoCodec.AV1 : (c.Equals("h265", StringComparison.OrdinalIgnoreCase) || c.Equals("hevc", StringComparison.OrdinalIgnoreCase) ? VideoCodec.Hevc : VideoCodec.H264);
             if (map.TryGetValue("hw", out var hw)) o.Hw = hw.ToLowerInvariant();
             if (map.TryGetValue("format", out var fmt)) o.Format = fmt;
             if (map.TryGetValue("audio", out var au)) o.AudioCodec = au.Equals("none", StringComparison.OrdinalIgnoreCase) ? AudioCodec.None : au.Equals("mp3", StringComparison.OrdinalIgnoreCase) ? AudioCodec.Mp3 : AudioCodec.Aac;
             if (map.TryGetValue("out", out var outp)) o.Output = outp;
-            if (map.TryGetValue("rc", out var rc)) o.Rc = rc.Equals("cq", StringComparison.OrdinalIgnoreCase) ? RateControl.Cq : rc.Equals("vbr", StringComparison.OrdinalIgnoreCase) ? RateControl.Vbr : RateControl.Cbr;
+            if (map.TryGetValue("rc", out var rc)) o.Rc = rc.Equals("cqp", StringComparison.OrdinalIgnoreCase) ? RateControl.Cqp : rc.Equals("cq", StringComparison.OrdinalIgnoreCase) ? RateControl.Cq : rc.Equals("vbr", StringComparison.OrdinalIgnoreCase) ? RateControl.Vbr : RateControl.Cbr;
             if (map.TryGetValue("quality", out var q)) o.Quality = int.Parse(q);
+
+            if (map.ContainsKey("obs-nvenc"))
+            {
+                o.Nvenc = new NvencOptions
+                {
+                    RateControl = o.Rc,
+                    BitrateBps = 6_000_000,
+                    MaxBitrateBps = 10_000_000,
+                    Cqp = o.Quality,
+                    KeyframeIntervalSec = 2,
+                    Preset = "p5",
+                    Tuning = "hq",
+                    Multipass = "qres",
+                    Profile = "main",
+                    LookAhead = true,
+                    AdaptiveQuantization = true,
+                    BFrames = 2,
+                    BFrameRefMode = "middle",
+                };
+            }
 
             return o;
         }

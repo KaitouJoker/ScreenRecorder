@@ -28,7 +28,7 @@
     <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
     <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
     <!-- Managed FFmpeg bindings — replaces the C++/CLI MediaEncoder (P1 encode/mux). -->
-    <PackageReference Include="FFmpeg.AutoGen" Version="8.1.0" />
+    <PackageReference Include="FFmpeg.AutoGen" Version="9.0.1.1" />
     <!-- WASAPI capture (P3 audio). -->
     <PackageReference Include="NAudio" Version="2.3.0" />
   </ItemGroup>

@@ -48,7 +48,8 @@ namespace MediaEncoder
             RateControl rateControl = RateControl.Cbr,
             bool globalHeader = true,
             string presetOverride = null,
-            int quality = 23)
+            int quality = 23,
+            NvencOptions nvencOptions = null)
         {
             FFmpegBootstrap.EnsureInitialized();
 
@@ -76,13 +77,16 @@ namespace MediaEncoder
             _ctx->height = height;
             _ctx->time_base = new AVRational { num = fpsDenominator, den = fpsNumerator };
             _ctx->framerate = new AVRational { num = fpsNumerator, den = fpsDenominator };
-            _ctx->gop_size = (int)(2.0 * fpsNumerator / fpsDenominator);
+            if (nvencOptions != null && nvencOptions.KeyframeIntervalSec > 0)
+                _ctx->gop_size = (int)((double)nvencOptions.KeyframeIntervalSec * fpsNumerator / fpsDenominator);
+            else
+                _ctx->gop_size = (int)(2.0 * fpsNumerator / fpsDenominator);
             _ctx->pix_fmt = SelectPixelFormat(_ctx, _codec);
 
             if (globalHeader)
                 _ctx->flags |= ffmpeg.AV_CODEC_FLAG_GLOBAL_HEADER;
 
-            InitializeCodec(hw, rateControl, bitrateBps, quality, presetOverride);
+            InitializeCodec(hw, rateControl, bitrateBps, quality, presetOverride, nvencOptions);
 
             int openResult = ffmpeg.avcodec_open2(_ctx, _codec, null);
             if (openResult < 0)
@@ -143,6 +147,13 @@ namespace MediaEncoder
                         HwAccel.Qsv => new[] { "hevc_qsv" },
                         _ => new[] { "libx265" },
                     };
+                case VideoCodec.AV1:
+                    return hw switch
+                    {
+                        HwAccel.Nvenc => new[] { "av1_nvenc" },
+                        HwAccel.Qsv => new[] { "av1_qsv" },
+                        _ => new[] { "libsvtav1", "libaom-av1" },
+                    };
                 default:
                     throw new ArgumentOutOfRangeException(nameof(codec), codec, "Unsupported video codec");
             }
@@ -168,7 +179,7 @@ namespace MediaEncoder
             return fallback;
         }
 
-        private void InitializeCodec(HwAccel hw, RateControl rateControl, int bitrate, int quality, string presetOverride)
+        private void InitializeCodec(HwAccel hw, RateControl rateControl, int bitrate, int quality, string presetOverride, NvencOptions nvencOptions)
         {
             void* priv = _ctx->priv_data;
             bool cbr = rateControl == RateControl.Cbr;
@@ -183,22 +194,81 @@ namespace MediaEncoder
             switch (hw)
             {
                 case HwAccel.Nvenc:
-                    _ctx->max_b_frames = 0;
-                    ffmpeg.av_opt_set_int(priv, "cbr", cbr ? 1 : 0, 0);
-                    if (cbr)
+                    if (nvencOptions != null)
                     {
-                        _ctx->rc_min_rate = bitrate;
-                        _ctx->rc_max_rate = bitrate;
-                        _ctx->rc_buffer_size = bitrate;
+                        if (nvencOptions.RateControl == RateControl.Cqp)
+                        {
+                            ffmpeg.av_opt_set(priv, "rc", "constqp", 0);
+                            ffmpeg.av_opt_set_int(priv, "qp", nvencOptions.Cqp, 0);
+                            _ctx->bit_rate = 0;
+                        }
+                        else if (nvencOptions.RateControl == RateControl.Vbr)
+                        {
+                            ffmpeg.av_opt_set(priv, "rc", "vbr", 0);
+                            int targetBps = nvencOptions.BitrateBps > 0 ? nvencOptions.BitrateBps : bitrate;
+                            long maxBps = nvencOptions.MaxBitrateBps > 0 ? nvencOptions.MaxBitrateBps : targetBps * 2L;
+                            _ctx->bit_rate = targetBps;
+                            _ctx->rc_max_rate = maxBps;
+                            _ctx->rc_buffer_size = (int)Math.Min(int.MaxValue, maxBps);
+                        }
+                        else // CBR or fallback
+                        {
+                            ffmpeg.av_opt_set(priv, "rc", "cbr", 0);
+                            ffmpeg.av_opt_set_int(priv, "cbr", 1, 0);
+                            int targetBps = nvencOptions.BitrateBps > 0 ? nvencOptions.BitrateBps : bitrate;
+                            _ctx->rc_min_rate = targetBps;
+                            _ctx->rc_max_rate = targetBps;
+                            _ctx->rc_buffer_size = targetBps;
+                            _ctx->bit_rate = targetBps;
+                        }
+
+                        ffmpeg.av_opt_set(priv, "preset", nvencOptions.Preset ?? presetOverride ?? "p4", 0);
+                        ffmpeg.av_opt_set(priv, "tune", nvencOptions.Tuning ?? "hq", 0);
+
+                        if (!string.IsNullOrEmpty(nvencOptions.Multipass))
+                            ffmpeg.av_opt_set(priv, "multipass", nvencOptions.Multipass, 0);
+
+                        if (!string.IsNullOrEmpty(nvencOptions.Profile))
+                            ffmpeg.av_opt_set(priv, "profile", nvencOptions.Profile, 0);
+
+                        if (nvencOptions.LookAhead)
+                        {
+                            ffmpeg.av_opt_set_int(priv, "rc-lookahead", 32, 0);
+                            ffmpeg.av_opt_set_int(priv, "no-scenecut", 0, 0);
+                        }
+                        else
+                        {
+                            ffmpeg.av_opt_set_int(priv, "rc-lookahead", 0, 0);
+                        }
+
+                        ffmpeg.av_opt_set_int(priv, "spatial-aq", nvencOptions.AdaptiveQuantization ? 1 : 0, 0);
+                        ffmpeg.av_opt_set_int(priv, "temporal-aq", nvencOptions.AdaptiveQuantization ? 1 : 0, 0);
+
+                        _ctx->max_b_frames = Math.Max(0, Math.Min(4, nvencOptions.BFrames));
+                        if (_ctx->max_b_frames > 0 && !string.IsNullOrEmpty(nvencOptions.BFrameRefMode) && nvencOptions.BFrameRefMode != "disabled")
+                        {
+                            ffmpeg.av_opt_set(priv, "b_ref_mode", nvencOptions.BFrameRefMode, 0);
+                        }
                     }
-                    else if (cq)
+                    else
                     {
-                        // ffmpeg CLI equivalent: -rc vbr -cq <q> -b:v 0
-                        ffmpeg.av_opt_set(priv, "rc", "vbr", 0);
-                        ffmpeg.av_opt_set_int(priv, "cq", quality, 0);
+                        _ctx->max_b_frames = 0;
+                        ffmpeg.av_opt_set_int(priv, "cbr", cbr ? 1 : 0, 0);
+                        if (cbr)
+                        {
+                            _ctx->rc_min_rate = bitrate;
+                            _ctx->rc_max_rate = bitrate;
+                            _ctx->rc_buffer_size = bitrate;
+                        }
+                        else if (cq)
+                        {
+                            // ffmpeg CLI equivalent: -rc vbr -cq <q> -b:v 0
+                            ffmpeg.av_opt_set(priv, "rc", "vbr", 0);
+                            ffmpeg.av_opt_set_int(priv, "cq", quality, 0);
+                        }
+                        ffmpeg.av_opt_set(priv, "preset", presetOverride ?? "p4", 0);
+                        ffmpeg.av_opt_set(priv, "tune", "ll", 0);
                     }
-                    ffmpeg.av_opt_set(priv, "preset", presetOverride ?? "p4", 0);
-                    ffmpeg.av_opt_set(priv, "tune", "ll", 0);
                     break;
 
                 case HwAccel.Qsv:

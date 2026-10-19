@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -93,6 +93,20 @@ namespace ScreenRecorder
                 config.Add(nameof(WindowLeft), WindowLeft.ToString());
                 config.Add(nameof(WindowTop), WindowTop.ToString());
 
+                config.Add(nameof(NvencRateControl), NvencRateControl);
+                config.Add(nameof(NvencBitrate), NvencBitrate.ToString());
+                config.Add(nameof(NvencMaxBitrate), NvencMaxBitrate.ToString());
+                config.Add(nameof(NvencCqp), NvencCqp.ToString());
+                config.Add(nameof(NvencKeyframeIntervalSec), NvencKeyframeIntervalSec.ToString());
+                config.Add(nameof(NvencPreset), NvencPreset);
+                config.Add(nameof(NvencTuning), NvencTuning);
+                config.Add(nameof(NvencMultipass), NvencMultipass);
+                config.Add(nameof(NvencProfile), NvencProfile);
+                config.Add(nameof(NvencLookAhead), NvencLookAhead.ToString());
+                config.Add(nameof(NvencAdaptiveQuantization), NvencAdaptiveQuantization.ToString());
+                config.Add(nameof(NvencBFrames), NvencBFrames.ToString());
+                config.Add(nameof(NvencBFrameRefMode), NvencBFrameRefMode);
+
                 Config.Config.SaveToFile(filePath, config);
             }
         }
@@ -127,6 +141,20 @@ namespace ScreenRecorder
 
                     WindowLeft = Config.Config.GetDouble(config, nameof(WindowLeft), -1.0d);
                     WindowTop = Config.Config.GetDouble(config, nameof(WindowTop), -1.0d);
+
+                    NvencRateControl = Config.Config.GetString(config, nameof(NvencRateControl), "CBR");
+                    NvencBitrate = Config.Config.GetInt32(config, nameof(NvencBitrate), 10000000);
+                    NvencMaxBitrate = Config.Config.GetInt32(config, nameof(NvencMaxBitrate), 10000000);
+                    NvencCqp = Config.Config.GetInt32(config, nameof(NvencCqp), 20);
+                    NvencKeyframeIntervalSec = Config.Config.GetInt32(config, nameof(NvencKeyframeIntervalSec), 0);
+                    NvencPreset = Config.Config.GetString(config, nameof(NvencPreset), "p4");
+                    NvencTuning = Config.Config.GetString(config, nameof(NvencTuning), "hq");
+                    NvencMultipass = Config.Config.GetString(config, nameof(NvencMultipass), "qres");
+                    NvencProfile = Config.Config.GetString(config, nameof(NvencProfile), "main");
+                    NvencLookAhead = Config.Config.GetBool(config, nameof(NvencLookAhead), false);
+                    NvencAdaptiveQuantization = Config.Config.GetBool(config, nameof(NvencAdaptiveQuantization), true);
+                    NvencBFrames = Config.Config.GetInt32(config, nameof(NvencBFrames), 0);
+                    NvencBFrameRefMode = Config.Config.GetString(config, nameof(NvencBFrameRefMode), "disabled");
                 }
                 else
                 {
@@ -159,6 +187,20 @@ namespace ScreenRecorder
             RegionSelectionMode = RegionSelectionMode.UserRegion;
 
             RecordMicrophone = false;
+
+            NvencRateControl = "CBR";
+            NvencBitrate = 10000000;
+            NvencMaxBitrate = 10000000;
+            NvencCqp = 20;
+            NvencKeyframeIntervalSec = 0;
+            NvencPreset = "p4";
+            NvencTuning = "hq";
+            NvencMultipass = "qres";
+            NvencProfile = "main";
+            NvencLookAhead = false;
+            NvencAdaptiveQuantization = true;
+            NvencBFrames = 0;
+            NvencBFrameRefMode = "disabled";
         }
 
         #endregion
@@ -425,6 +467,128 @@ namespace ScreenRecorder
             get => _advancedSettings;
             set => SetProperty(ref _advancedSettings, value);
         }
+
+        #region OBS NVENC Settings
+
+        private string _nvencRateControl = "CBR";
+        public string NvencRateControl
+        {
+            get => _nvencRateControl;
+            set => SetProperty(ref _nvencRateControl, value);
+        }
+
+        private int _nvencBitrate = 10000000;
+        public int NvencBitrate
+        {
+            get => _nvencBitrate;
+            set => SetProperty(ref _nvencBitrate, value);
+        }
+
+        private int _nvencMaxBitrate = 10000000;
+        public int NvencMaxBitrate
+        {
+            get => _nvencMaxBitrate;
+            set => SetProperty(ref _nvencMaxBitrate, value);
+        }
+
+        private int _nvencCqp = 20;
+        public int NvencCqp
+        {
+            get => _nvencCqp;
+            set => SetProperty(ref _nvencCqp, value);
+        }
+
+        private int _nvencKeyframeIntervalSec = 0;
+        public int NvencKeyframeIntervalSec
+        {
+            get => _nvencKeyframeIntervalSec;
+            set => SetProperty(ref _nvencKeyframeIntervalSec, value);
+        }
+
+        private string _nvencPreset = "p4";
+        public string NvencPreset
+        {
+            get => _nvencPreset;
+            set => SetProperty(ref _nvencPreset, value);
+        }
+
+        private string _nvencTuning = "hq";
+        public string NvencTuning
+        {
+            get => _nvencTuning;
+            set => SetProperty(ref _nvencTuning, value);
+        }
+
+        private string _nvencMultipass = "qres";
+        public string NvencMultipass
+        {
+            get => _nvencMultipass;
+            set => SetProperty(ref _nvencMultipass, value);
+        }
+
+        private string _nvencProfile = "main";
+        public string NvencProfile
+        {
+            get => _nvencProfile;
+            set => SetProperty(ref _nvencProfile, value);
+        }
+
+        private bool _nvencLookAhead = false;
+        public bool NvencLookAhead
+        {
+            get => _nvencLookAhead;
+            set => SetProperty(ref _nvencLookAhead, value);
+        }
+
+        private bool _nvencAdaptiveQuantization = true;
+        public bool NvencAdaptiveQuantization
+        {
+            get => _nvencAdaptiveQuantization;
+            set => SetProperty(ref _nvencAdaptiveQuantization, value);
+        }
+
+        private int _nvencBFrames = 0;
+        public int NvencBFrames
+        {
+            get => _nvencBFrames;
+            set => SetProperty(ref _nvencBFrames, value);
+        }
+
+        private string _nvencBFrameRefMode = "disabled";
+        public string NvencBFrameRefMode
+        {
+            get => _nvencBFrameRefMode;
+            set => SetProperty(ref _nvencBFrameRefMode, value);
+        }
+
+        public NvencOptions GetNvencOptions()
+        {
+            RateControl rc = NvencRateControl switch
+            {
+                "CQP" => RateControl.Cqp,
+                "VBR" => RateControl.Vbr,
+                _ => RateControl.Cbr,
+            };
+
+            return new NvencOptions
+            {
+                RateControl = rc,
+                Cqp = NvencCqp,
+                BitrateBps = NvencBitrate,
+                MaxBitrateBps = NvencMaxBitrate,
+                KeyframeIntervalSec = NvencKeyframeIntervalSec,
+                Preset = NvencPreset,
+                Tuning = NvencTuning,
+                Multipass = NvencMultipass,
+                Profile = NvencProfile,
+                LookAhead = NvencLookAhead,
+                AdaptiveQuantization = NvencAdaptiveQuantization,
+                BFrames = NvencBFrames,
+                BFrameRefMode = NvencBFrameRefMode,
+            };
+        }
+
+        #endregion
 
         #endregion
 

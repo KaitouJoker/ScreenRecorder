@@ -21,6 +21,9 @@ namespace ScreenRecorder.Encoder
 
         /// <summary>Constant-quality value for <see cref="RateControl.Cq"/> (0–51, lower = better).</summary>
         public int Quality = 23;
+
+        /// <summary>OBS-based detailed NVENC options.</summary>
+        public NvencOptions NvencOptions;
     }
 
     /// <summary>Audio stream parameters for a <see cref="Recorder"/> (null on the recorder = no audio).</summary>
@@ -112,7 +115,8 @@ namespace ScreenRecorder.Encoder
             _videoEncoder = new FFmpegVideoEncoder(
                 _videoParams.Codec, _videoParams.Hw, _videoParams.Width, _videoParams.Height,
                 _videoParams.FpsNumerator, _videoParams.FpsDenominator, _videoParams.Bitrate,
-                _videoParams.RateControl, _container.GlobalHeader, quality: _videoParams.Quality);
+                _videoParams.RateControl, _container.GlobalHeader, quality: _videoParams.Quality,
+                nvencOptions: _videoParams.NvencOptions);
 
             if (_audioParams != null)
             {

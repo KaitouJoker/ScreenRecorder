@@ -21,6 +21,7 @@
       guarded explicitly with ApiInformation in P2 (Aurora pattern), not via this analyzer.
     -->
     <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 
 </Project>

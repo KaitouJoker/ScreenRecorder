@@ -12,10 +12,19 @@ namespace ScreenRecorder.Encoder
             set => SetProperty(ref _videoCodec, value);
         }
 
-        public EncoderVideoCodec(VideoCodec videoCodec, string name)
+        private bool _isSupported = true;
+
+        public bool IsSupported
+        {
+            get => _isSupported;
+            set => SetProperty(ref _isSupported, value);
+        }
+
+        public EncoderVideoCodec(VideoCodec videoCodec, string name, bool isSupported = true)
         {
             _videoCodec = videoCodec;
             Name = name;
+            _isSupported = isSupported;
         }
     }
 }

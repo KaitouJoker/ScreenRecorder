@@ -5,7 +5,7 @@ namespace MediaEncoder
 {
     /// <summary>
     /// One-time FFmpeg.AutoGen initialization. Sets the native-DLL search path to the app base
-    /// directory (the FFmpeg 8.x shared DLLs are copied next to the exe) and registers devices.
+    /// directory (the FFmpeg 9.x shared DLLs are copied next to the exe) and registers devices.
     /// Idempotent and thread-safe; the first FFmpeg call from anywhere goes through here so a
     /// missing/mismatched DLL fails loudly at startup rather than deep inside an encode.
     /// </summary>

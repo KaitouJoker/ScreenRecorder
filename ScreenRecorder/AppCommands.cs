@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -195,6 +195,8 @@ namespace ScreenRecorder
         private DelegateCommand _openRecordDirecotryCommand;
         private DelegateCommand _selectRecordDirectory;
         private DelegateCommand _openShortcutSettingsCommand;
+        private DelegateCommand _openEncoderSettingsCommand;
+        private DelegateCommand _dismissToastCommand;
         private DelegateCommand _windowCloseCommand;
         private DelegateCommand _windowMinimizeCommand;
 
@@ -328,17 +330,37 @@ namespace ScreenRecorder
                                 ? AppConfig.Instance.SelectedRecordQualityMode
                                 : RecordQualityMode.Bitrate;
 
+                            MediaEncoder.NvencOptions nvencOptions = null;
+                            MediaEncoder.RateControl rateControl = qualityMode == RecordQualityMode.Bitrate ? MediaEncoder.RateControl.Cbr : MediaEncoder.RateControl.Cq;
+                            int quality = RecordQualityModeItem.ToQualityValue(qualityMode);
+                            int videoBitrate = AppConfig.Instance.SelectedRecordVideoBitrate;
+
+                            if (AppConfig.Instance.AdvancedSettings)
+                            {
+                                nvencOptions = AppConfig.Instance.GetNvencOptions();
+                                rateControl = nvencOptions.RateControl;
+                                if (rateControl == MediaEncoder.RateControl.Cqp)
+                                {
+                                    quality = nvencOptions.Cqp;
+                                }
+                                else if (rateControl == MediaEncoder.RateControl.Cbr || rateControl == MediaEncoder.RateControl.Vbr)
+                                {
+                                    videoBitrate = nvencOptions.BitrateBps;
+                                }
+                            }
+
                             // Start Record
                             try
                             {
                                 AppManager.Instance.ScreenEncoder.Start(encodeFormat.Format, filePath,
-                                    videoCodec, AppConfig.Instance.SelectedRecordVideoBitrate,
+                                    videoCodec, videoBitrate,
                                     audioCodec, AppConfig.Instance.SelectedRecordAudioBitrate,
                                     displayDeviceName, region,
                                     AppConfig.Instance.ScreenCaptureCursorVisible,
                                     AppConfig.Instance.RecordMicrophone,
-                                    qualityMode == RecordQualityMode.Bitrate ? MediaEncoder.RateControl.Cbr : MediaEncoder.RateControl.Cq,
-                                    RecordQualityModeItem.ToQualityValue(qualityMode));
+                                    rateControl,
+                                    quality,
+                                    nvencOptions);
                             }
                             catch
                             {
@@ -454,6 +476,24 @@ namespace ScreenRecorder
                 {
                     Shortcut.GlobalHotKey.PassthroughGlobalHotKey = false;
                 }
+            }));
+
+        #endregion
+
+        #region Encoder Settings & Toast Commands
+
+        public DelegateCommand OpenEncoderSettingsCommand => _openEncoderSettingsCommand ??
+            (_openEncoderSettingsCommand = new DelegateCommand(o =>
+            {
+                var settingsWindow = new EncoderSettingsWindow();
+                settingsWindow.Owner = Application.Current.MainWindow;
+                settingsWindow.ShowDialog();
+            }));
+
+        public DelegateCommand DismissToastCommand => _dismissToastCommand ??
+            (_dismissToastCommand = new DelegateCommand(o =>
+            {
+                AppManager.Instance.DismissToast();
             }));
 
         #endregion

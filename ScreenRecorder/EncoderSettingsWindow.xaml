@@ -1,0 +1,310 @@
+<Window
+    x:Class="ScreenRecorder.EncoderSettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="clr-namespace:ScreenRecorder"
+    xmlns:properties="clr-namespace:ScreenRecorder.Properties"
+    mc:Ignorable="d"
+    Background="#2D2D30"
+    Foreground="#F1F1F1"
+    WindowStartupLocation="CenterOwner"
+    WindowStyle="ToolWindow"
+    Topmost="True"
+    ResizeMode="NoResize"
+    SizeToContent="Height"
+    Width="500"
+    Title="{x:Static properties:Resources.EncoderSettingsWindowTitle}"
+    >
+    <Window.Resources>
+        <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="#DDDDDD" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="4 3 8 3" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style TargetType="{x:Type ComboBox}">
+            <Setter Property="Margin" Value="4 3 4 3" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style TargetType="{x:Type GroupBox}">
+            <Setter Property="Foreground" Value="#007ACC" />
+            <Setter Property="BorderBrush" Value="#3F3F46" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Margin" Value="8 4 8 4" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="4">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 1. 전송률 제어 (Rate Control) -->
+        <GroupBox Grid.Row="0" Header="{x:Static properties:Resources.RateControl}">
+            <Grid Grid.IsSharedSizeScope="True">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- 전송률 제어 방식 -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static properties:Resources.RateControl}" />
+                <ComboBox
+                    Grid.Row="0" Grid.Column="1"
+                    ItemsSource="{Binding RateControlModes}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencRateControl, Mode=TwoWay}"
+                    />
+
+                <!-- 목표 비트레이트 (CBR / VBR) -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static properties:Resources.BitrateKbps}">
+                    <TextBlock.Style>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource {x:Type TextBlock}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencRateControl}" Value="CQP">
+                                    <Setter Property="Foreground" Value="#666666" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ComboBox
+                    Grid.Row="1" Grid.Column="1"
+                    ItemsSource="{Binding BitrateOptions}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencBitrate, Mode=TwoWay}"
+                    >
+                    <ComboBox.Style>
+                        <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencRateControl}" Value="CQP">
+                                    <Setter Property="IsEnabled" Value="False" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ComboBox.Style>
+                </ComboBox>
+
+                <!-- 최대 비트레이트 (VBR 전용) -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static properties:Resources.MaxBitrateKbps}">
+                    <TextBlock.Style>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource {x:Type TextBlock}}">
+                            <Setter Property="Foreground" Value="#666666" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencRateControl}" Value="VBR">
+                                    <Setter Property="Foreground" Value="#DDDDDD" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ComboBox
+                    Grid.Row="2" Grid.Column="1"
+                    ItemsSource="{Binding BitrateOptions}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencMaxBitrate, Mode=TwoWay}"
+                    >
+                    <ComboBox.Style>
+                        <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
+                            <Setter Property="IsEnabled" Value="False" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencRateControl}" Value="VBR">
+                                    <Setter Property="IsEnabled" Value="True" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ComboBox.Style>
+                </ComboBox>
+
+                <!-- CQ 레벨 / QP (CQP 전용) -->
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="{x:Static properties:Resources.CqpLevel}">
+                    <TextBlock.Style>
+                        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource {x:Type TextBlock}}">
+                            <Setter Property="Foreground" Value="#666666" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencRateControl}" Value="CQP">
+                                    <Setter Property="Foreground" Value="#DDDDDD" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ComboBox
+                    Grid.Row="3" Grid.Column="1"
+                    ItemsSource="{Binding CqpOptions}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencCqp, Mode=TwoWay}"
+                    >
+                    <ComboBox.Style>
+                        <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
+                            <Setter Property="IsEnabled" Value="False" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencRateControl}" Value="CQP">
+                                    <Setter Property="IsEnabled" Value="True" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ComboBox.Style>
+                </ComboBox>
+            </Grid>
+        </GroupBox>
+
+        <!-- 2. 품질 및 인코딩 속도 -->
+        <GroupBox Grid.Row="1" Header="{x:Static properties:Resources.Preset}">
+            <Grid Grid.IsSharedSizeScope="True">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- 키프레임 간격 -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static properties:Resources.KeyframeIntervalSec}" />
+                <ComboBox
+                    Grid.Row="0" Grid.Column="1"
+                    ItemsSource="{Binding KeyframeIntervals}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencKeyframeIntervalSec, Mode=TwoWay}"
+                    />
+
+                <!-- 프리셋 -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static properties:Resources.Preset}" />
+                <ComboBox
+                    Grid.Row="1" Grid.Column="1"
+                    ItemsSource="{Binding Presets}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencPreset, Mode=TwoWay}"
+                    />
+
+                <!-- 조정 (Tuning) -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static properties:Resources.Tuning}" />
+                <ComboBox
+                    Grid.Row="2" Grid.Column="1"
+                    ItemsSource="{Binding Tunings}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencTuning, Mode=TwoWay}"
+                    />
+
+                <!-- 멀티패스 모드 -->
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="{x:Static properties:Resources.Multipass}" />
+                <ComboBox
+                    Grid.Row="3" Grid.Column="1"
+                    ItemsSource="{Binding MultipassModes}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencMultipass, Mode=TwoWay}"
+                    />
+
+                <!-- 프로파일 -->
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="{x:Static properties:Resources.Profile}" />
+                <ComboBox
+                    Grid.Row="4" Grid.Column="1"
+                    ItemsSource="{Binding Profiles}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencProfile, Mode=TwoWay}"
+                    />
+            </Grid>
+        </GroupBox>
+
+        <!-- 3. 고급 하드웨어 기능 (Look-ahead, AQ, B-Frame) -->
+        <GroupBox Grid.Row="2" Header="{x:Static properties:Resources.BFrames}">
+            <Grid Grid.IsSharedSizeScope="True">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Look-ahead -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Static properties:Resources.LookAhead}" />
+                <CheckBox
+                    Grid.Row="0" Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Margin="4 4 4 4"
+                    Content="{x:Static properties:Resources.LookAhead}"
+                    Foreground="#DDDDDD"
+                    ToolTip="{x:Static properties:Resources.LookAhead_ToolTip}"
+                    IsChecked="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencLookAhead, Mode=TwoWay}"
+                    />
+
+                <!-- 적응형 양자화 (AQ) -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Static properties:Resources.AdaptiveQuantization}" />
+                <CheckBox
+                    Grid.Row="1" Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Margin="4 4 4 4"
+                    Content="{x:Static properties:Resources.AdaptiveQuantization}"
+                    Foreground="#DDDDDD"
+                    ToolTip="{x:Static properties:Resources.AdaptiveQuantization_ToolTip}"
+                    IsChecked="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencAdaptiveQuantization, Mode=TwoWay}"
+                    />
+
+                <!-- B-프레임 -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Static properties:Resources.BFrames}" />
+                <ComboBox
+                    Grid.Row="2" Grid.Column="1"
+                    ItemsSource="{Binding BFrameCounts}"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencBFrames, Mode=TwoWay}"
+                    />
+
+                <!-- B-Frame 참조 -->
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="{x:Static properties:Resources.BFrameRefMode}" />
+                <ComboBox
+                    Grid.Row="3" Grid.Column="1"
+                    ItemsSource="{Binding BFrameRefModes}"
+                    DisplayMemberPath="Name"
+                    SelectedValuePath="Value"
+                    SelectedValue="{Binding Source={x:Static local:AppConfig.Instance}, Path=NvencBFrameRefMode, Mode=TwoWay}"
+                    />
+            </Grid>
+        </GroupBox>
+
+        <!-- 4. 하단 버튼 -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="8 8 8 8">
+            <Button
+                Content="{x:Static properties:Resources.Close}"
+                Width="90" Height="26"
+                Background="#3E3E42"
+                Foreground="#FFFFFF"
+                BorderBrush="#555555"
+                Click="CloseButton_Click"
+                />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -15,6 +15,7 @@ namespace MediaEncoder
         private static bool _qsvH264;
         private static bool _nvencHevc;
         private static bool _qsvHevc;
+        private static bool _nvencAV1;
 
         public static void CheckHardwareCodec()
         {
@@ -24,6 +25,7 @@ namespace MediaEncoder
                 _qsvH264 = FFmpegHelper.IsEncoderUsable("h264_qsv");
                 _nvencHevc = FFmpegHelper.IsEncoderUsable("hevc_nvenc", "nvenc_hevc");
                 _qsvHevc = FFmpegHelper.IsEncoderUsable("hevc_qsv");
+                _nvencAV1 = FFmpegHelper.IsEncoderUsable("av1_nvenc");
                 _checked = true;
             }
         }
@@ -50,6 +52,12 @@ namespace MediaEncoder
         {
             EnsureChecked();
             return _qsvHevc;
+        }
+
+        public static bool IsSupportedNvencAV1()
+        {
+            EnsureChecked();
+            return _nvencAV1;
         }
 
         private static void EnsureChecked()

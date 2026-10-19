@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -257,5 +257,125 @@
   </data>
   <data name="RecordDelay" xml:space="preserve">
     <value>Start Delay (sec)</value>
+  </data>
+  <data name="Av1NotSupportedResetToH264" xml:space="preserve">
+    <value>Hardware AV1 (NVENC) is not supported on this system. Video codec has been reset to H.264.</value>
+  </data>
+  <data name="HardwareEncoderNotSupportedTooltip" xml:space="preserve">
+    <value>This codec is not supported by your system's graphics hardware.</value>
+  </data>
+  <data name="EncoderDetailedSettings" xml:space="preserve">
+    <value>Encoder Settings...</value>
+  </data>
+  <data name="EncoderSettingsWindowTitle" xml:space="preserve">
+    <value>Detailed Encoder Settings (OBS)</value>
+  </data>
+  <data name="RateControl" xml:space="preserve">
+    <value>Rate Control</value>
+  </data>
+  <data name="RateControl_CBR" xml:space="preserve">
+    <value>CBR</value>
+  </data>
+  <data name="RateControl_VBR" xml:space="preserve">
+    <value>VBR</value>
+  </data>
+  <data name="RateControl_CQP" xml:space="preserve">
+    <value>CQP</value>
+  </data>
+  <data name="BitrateKbps" xml:space="preserve">
+    <value>Bitrate (Kbps)</value>
+  </data>
+  <data name="MaxBitrateKbps" xml:space="preserve">
+    <value>Max Bitrate (Kbps)</value>
+  </data>
+  <data name="CqpLevel" xml:space="preserve">
+    <value>CQ Level / QP (1 ~ 63)</value>
+  </data>
+  <data name="KeyframeIntervalSec" xml:space="preserve">
+    <value>Keyframe Interval (seconds, 0 = auto)</value>
+  </data>
+  <data name="Preset" xml:space="preserve">
+    <value>Preset</value>
+  </data>
+  <data name="Preset_P1" xml:space="preserve">
+    <value>P1: Fastest (Lowest Quality)</value>
+  </data>
+  <data name="Preset_P2" xml:space="preserve">
+    <value>P2: Faster (Lower Quality)</value>
+  </data>
+  <data name="Preset_P3" xml:space="preserve">
+    <value>P3: Fast (Low Quality)</value>
+  </data>
+  <data name="Preset_P4" xml:space="preserve">
+    <value>P4: Medium (Default)</value>
+  </data>
+  <data name="Preset_P5" xml:space="preserve">
+    <value>P5: Slow (Good Quality)</value>
+  </data>
+  <data name="Preset_P6" xml:space="preserve">
+    <value>P6: Slower (Better Quality)</value>
+  </data>
+  <data name="Preset_P7" xml:space="preserve">
+    <value>P7: Slowest (Best Quality)</value>
+  </data>
+  <data name="Tuning" xml:space="preserve">
+    <value>Tuning</value>
+  </data>
+  <data name="Tuning_UHQ" xml:space="preserve">
+    <value>Ultra High Quality (Slow)</value>
+  </data>
+  <data name="Tuning_HQ" xml:space="preserve">
+    <value>High Quality</value>
+  </data>
+  <data name="Tuning_LL" xml:space="preserve">
+    <value>Low Latency</value>
+  </data>
+  <data name="Tuning_ULL" xml:space="preserve">
+    <value>Ultra Low Latency</value>
+  </data>
+  <data name="Multipass" xml:space="preserve">
+    <value>Multipass Mode</value>
+  </data>
+  <data name="Multipass_Disabled" xml:space="preserve">
+    <value>Single Pass</value>
+  </data>
+  <data name="Multipass_Qres" xml:space="preserve">
+    <value>Two Passes (Quarter Resolution)</value>
+  </data>
+  <data name="Multipass_Fullres" xml:space="preserve">
+    <value>Two Passes (Full Resolution)</value>
+  </data>
+  <data name="Profile" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="LookAhead" xml:space="preserve">
+    <value>Look-ahead</value>
+  </data>
+  <data name="LookAhead_ToolTip" xml:space="preserve">
+    <value>Enable Look-ahead.&#10;&#10;Improves visual quality by analyzing upcoming frames to determine better bitrate distribution, but may increase GPU usage and latency.</value>
+  </data>
+  <data name="AdaptiveQuantization" xml:space="preserve">
+    <value>Adaptive Quantization</value>
+  </data>
+  <data name="AdaptiveQuantization_ToolTip" xml:space="preserve">
+    <value>Enable temporal and spatial adaptive quantization to improve perceived quality by optimizing bitrate distribution.</value>
+  </data>
+  <data name="BFrames" xml:space="preserve">
+    <value>B-Frames</value>
+  </data>
+  <data name="BFrameRefMode" xml:space="preserve">
+    <value>B-Frame as Reference</value>
+  </data>
+  <data name="BFrameRefMode_Disabled" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="BFrameRefMode_Each" xml:space="preserve">
+    <value>Each Frame (EACH)</value>
+  </data>
+  <data name="BFrameRefMode_Middle" xml:space="preserve">
+    <value>Middle B-Frame Only</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>Close</value>
   </data>
 </root>

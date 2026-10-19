@@ -345,3 +345,10 @@ ffmpeg_shared_lib/*
 
 # Built installers
 dist/
+
+# Release folder
+Release/
+release/
+
+# target binary folder
+target/

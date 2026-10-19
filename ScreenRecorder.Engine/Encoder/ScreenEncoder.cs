@@ -42,7 +42,7 @@ namespace ScreenRecorder.Encoder
         }
 
         public void Start(string format, string url, VideoCodec videoCodec, int videoBitrate, AudioCodec audioCodec, int audioBitrate, string deviceName, Rect region, bool drawCursor, bool recordMicrophone,
-            RateControl rateControl = RateControl.Cbr, int quality = 23)
+            RateControl rateControl = RateControl.Cbr, int quality = 23, NvencOptions nvencOptions = null)
         {
             if (base.IsRunning)
                 return;
@@ -70,6 +70,7 @@ namespace ScreenRecorder.Encoder
                 Bitrate = videoBitrate,
                 RateControl = rateControl,
                 Quality = quality,
+                NvencOptions = nvencOptions,
             };
 
             AudioParams audioParams = audioCodec == AudioCodec.None ? null : new AudioParams
@@ -117,6 +118,9 @@ namespace ScreenRecorder.Encoder
             if (codec == VideoCodec.H264)
                 return MediaWriter.IsSupportedNvencH264() ? HwAccel.Nvenc
                     : allowQsv && MediaWriter.IsSupportedQsvH264() ? HwAccel.Qsv : HwAccel.Software;
+
+            if (codec == VideoCodec.AV1)
+                return MediaWriter.IsSupportedNvencAV1() ? HwAccel.Nvenc : HwAccel.Software;
 
             return MediaWriter.IsSupportedNvencHEVC() ? HwAccel.Nvenc
                 : allowQsv && MediaWriter.IsSupportedQsvHEVC() ? HwAccel.Qsv : HwAccel.Software;

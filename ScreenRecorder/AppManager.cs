@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media;
@@ -141,6 +141,30 @@ namespace ScreenRecorder
             private set => SetProperty(ref _notSupportedHwHevc, value);
         }
 
+        private bool _notSupportedHwAV1 = true;
+
+        public bool NotSupportedHwAV1
+        {
+            get => _notSupportedHwAV1;
+            private set => SetProperty(ref _notSupportedHwAV1, value);
+        }
+
+        private string _toastMessage;
+
+        public string ToastMessage
+        {
+            get => _toastMessage;
+            set => SetProperty(ref _toastMessage, value);
+        }
+
+        private bool _isToastVisible;
+
+        public bool IsToastVisible
+        {
+            get => _isToastVisible;
+            set => SetProperty(ref _isToastVisible, value);
+        }
+
         #endregion
 
         #region Helpers
@@ -164,6 +188,7 @@ namespace ScreenRecorder
             {
                 new EncoderVideoCodec(MediaEncoder.VideoCodec.H264, "H.264"),
                 new EncoderVideoCodec(MediaEncoder.VideoCodec.H265, "H.265 (HEVC)"),
+                new EncoderVideoCodec(MediaEncoder.VideoCodec.AV1, "AV1"),
             };
             EncoderAudioCodecs = new EncoderAudioCodec[]
             {
@@ -204,13 +229,74 @@ namespace ScreenRecorder
             IsInitialized = true;
         }
 
+        private System.Threading.CancellationTokenSource _toastCts;
+
+        public void ShowToast(string message, int durationMs = 5000)
+        {
+            System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                _toastCts?.Cancel();
+                _toastCts = new System.Threading.CancellationTokenSource();
+                var token = _toastCts.Token;
+
+                ToastMessage = message;
+                IsToastVisible = true;
+
+                Task.Delay(durationMs, token).ContinueWith(t =>
+                {
+                    if (!t.IsCanceled)
+                    {
+                        System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+                        {
+                            IsToastVisible = false;
+                        });
+                    }
+                }, TaskScheduler.Default);
+            });
+        }
+
+        public void DismissToast()
+        {
+            _toastCts?.Cancel();
+            IsToastVisible = false;
+        }
+
         private async void CheckHardwareCodec()
         {
             await Task.Run(() =>
             {
                 MediaEncoder.MediaWriter.CheckHardwareCodec();
-                NotSupportedHwH264 = !MediaEncoder.MediaWriter.IsSupportedNvencH264() && !MediaEncoder.MediaWriter.IsSupportedQsvH264();
-                NotSupportedHwHevc = !MediaEncoder.MediaWriter.IsSupportedNvencHEVC() && !MediaEncoder.MediaWriter.IsSupportedQsvHEVC();
+                bool supportedNvencH264 = MediaEncoder.MediaWriter.IsSupportedNvencH264();
+                bool supportedQsvH264 = MediaEncoder.MediaWriter.IsSupportedQsvH264();
+                bool supportedNvencHevc = MediaEncoder.MediaWriter.IsSupportedNvencHEVC();
+                bool supportedQsvHevc = MediaEncoder.MediaWriter.IsSupportedQsvHEVC();
+                bool supportedNvencAV1 = MediaEncoder.MediaWriter.IsSupportedNvencAV1();
+
+                System.Windows.Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    NotSupportedHwH264 = !supportedNvencH264 && !supportedQsvH264;
+                    NotSupportedHwHevc = !supportedNvencHevc && !supportedQsvHevc;
+                    NotSupportedHwAV1 = !supportedNvencAV1;
+
+                    if (EncoderVideoCodecs != null)
+                    {
+                        foreach (var codec in EncoderVideoCodecs)
+                        {
+                            if (codec.VideoCodec == MediaEncoder.VideoCodec.AV1)
+                            {
+                                codec.IsSupported = supportedNvencAV1;
+                            }
+                        }
+                    }
+
+                    // If hardware does not support AV1 but config had AV1 selected from previous session,
+                    // reset to H.264 default and notify the user with a toast message.
+                    if (!supportedNvencAV1 && AppConfig.Instance.SelectedRecordVideoCodec == MediaEncoder.VideoCodec.AV1)
+                    {
+                        AppConfig.Instance.SelectedRecordVideoCodec = MediaEncoder.VideoCodec.H264;
+                        ShowToast(Properties.Resources.Av1NotSupportedResetToH264);
+                    }
+                });
             });
         }
 
