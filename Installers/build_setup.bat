@@ -21,6 +21,8 @@ dotnet publish "%ROOT%\ScreenRecorder\ScreenRecorder.csproj" -c Release -r win-x
   -o "%ROOT%\publish\x64"
 if errorlevel 1 ( echo publish failed & exit /b 1 )
 
+copy /y "%ROOT%\publish\x64\ScreenRecorder.exe" "%ROOT%\publish\x64\DisplayHost.exe" >nul
+
 if not exist "%ROOT%\dist" mkdir "%ROOT%\dist"
 
 echo === [2/4] Packaging portable zip ===

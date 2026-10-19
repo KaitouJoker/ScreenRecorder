@@ -119,23 +119,30 @@ namespace ScreenRecorder.VideoSource
 
         private void OnTick(long ptsQpc, long gridIndex, bool isDuplicate)
         {
-            if (!isDuplicate || !_hasHeld)
+            try
             {
-                if (_capture.TryCopyLatest(_device.Context, _regionTex, _crop))
+                if (!isDuplicate || !_hasHeld)
                 {
-                    if (_nv12.Convert(_regionTex, _outW, _outH, out nint plane, out int stride, out int slice))
+                    if (_capture.TryCopyLatest(_device.Context, _regionTex, _crop))
                     {
-                        EnsureOutBuffer(slice);
-                        Unsafe.CopyBlockUnaligned((void*)_outBuffer, (void*)plane, (uint)slice);
-                        _nv12.Unmap();
-                        _lastStride = stride;
-                        _hasHeld = true;
+                        if (_nv12.Convert(_regionTex, _outW, _outH, out nint plane, out int stride, out int slice))
+                        {
+                            EnsureOutBuffer(slice);
+                            Unsafe.CopyBlockUnaligned((void*)_outBuffer, (void*)plane, (uint)slice);
+                            _nv12.Unmap();
+                            _lastStride = stride;
+                            _hasHeld = true;
+                        }
                     }
                 }
-            }
 
-            if (_hasHeld)
-                _recorder.PushVideoFrame(new RawVideoFrame(_outBuffer, _lastStride, _outW, _outH, PixelFormat.NV12, ptsQpc));
+                if (_hasHeld)
+                    _recorder.PushVideoFrame(new RawVideoFrame(_outBuffer, _lastStride, _outW, _outH, PixelFormat.NV12, ptsQpc));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ScreenVideoSource.OnTick Exception]: {ex.Message}");
+            }
         }
 
         private void EnsureOutBuffer(int size)

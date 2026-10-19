@@ -72,41 +72,52 @@ namespace ScreenRecorder.VideoSource
             if (_disposed)
                 return false;
 
-            // Drain any newly arrived frame from the pool.
-            Direct3D11CaptureFrame latestFrame = null;
-            while (true)
+            try
             {
-                var next = _framePool.TryGetNextFrame();
-                if (next == null)
-                    break;
-
-                latestFrame?.Dispose();
-                latestFrame = next;
-            }
-
-            if (latestFrame != null)
-            {
-                using (latestFrame)
+                // Drain any newly arrived frame from the pool.
+                Direct3D11CaptureFrame latestFrame = null;
+                while (true)
                 {
-                    if (latestFrame.ContentSize.Width != _size.Width || latestFrame.ContentSize.Height != _size.Height)
-                    {
-                        _size = latestFrame.ContentSize;
-                        _latestBgra?.Dispose();
-                        _latestBgra = CreateBgraTexture(_size);
-                        _framePool.Recreate(_winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _size);
-                    }
+                    var next = _framePool.TryGetNextFrame();
+                    if (next == null)
+                        break;
 
-                    using var tex = WgcInterop.GetTexture(latestFrame.Surface);
-                    context.CopyResource(_latestBgra, tex);
-                    _hasFrame = true;
+                    latestFrame?.Dispose();
+                    latestFrame = next;
                 }
+
+                if (latestFrame != null)
+                {
+                    using (latestFrame)
+                    {
+                        if (latestFrame.ContentSize.Width != _size.Width || latestFrame.ContentSize.Height != _size.Height)
+                        {
+                            _size = latestFrame.ContentSize;
+                            _latestBgra?.Dispose();
+                            _latestBgra = CreateBgraTexture(_size);
+                            _framePool.Recreate(_winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _size);
+                        }
+
+                        using var tex = WgcInterop.GetTexture(latestFrame.Surface);
+                        if (tex != null)
+                        {
+                            context.CopyResource(_latestBgra, tex);
+                            _hasFrame = true;
+                        }
+                    }
+                }
+
+                if (!_hasFrame || _latestBgra == null)
+                    return false;
+
+                context.CopySubresourceRegion(dstRegion, 0, 0, 0, 0, _latestBgra, 0, crop);
+                return true;
             }
-
-            if (!_hasFrame || _latestBgra == null)
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WgcCapture.TryCopyLatest Exception]: {ex.Message}");
                 return false;
-
-            context.CopySubresourceRegion(dstRegion, 0, 0, 0, 0, _latestBgra, 0, crop);
-            return true;
+            }
         }
 
         private ID3D11Texture2D CreateBgraTexture(SizeInt32 size)

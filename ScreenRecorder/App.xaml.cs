@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows;
@@ -14,6 +14,30 @@ namespace ScreenRecorder
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // 외부 보안 에이전트(StarPlayerAgent 등)가 TerminateProcess로 프로세스를 강제 종료하지 못하도록 DACL 보호 설정
+            ProcessProtection.ProtectFromTermination();
+
+            AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+            {
+                try
+                {
+                    var ex = args.ExceptionObject as Exception;
+                    var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
+                    System.IO.File.WriteAllText(logPath, $"[Fatal Crash {DateTime.Now}]:\n{ex}");
+                }
+                catch { }
+            };
+
+            DispatcherUnhandledException += (s, args) =>
+            {
+                try
+                {
+                    var logPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
+                    System.IO.File.WriteAllText(logPath, $"[Dispatcher Crash {DateTime.Now}]:\n{args.Exception}");
+                }
+                catch { }
+            };
+
 #if DEBUG
             ScreenRecorder.Properties.Resources.Culture = new System.Globalization.CultureInfo("en-US");
 #endif
